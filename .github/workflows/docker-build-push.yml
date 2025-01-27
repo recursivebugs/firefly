@@ -42,7 +42,7 @@ jobs:
       # ------------------
 
       # 7. Debug: Print the TMAS_API_KEY to the logs
-      # WARNING: This will expose your secret in the logs!
+      # WARNING: This will expose your secret in the logs!!
       - name: Debug print TMAS_API_KEY
         run: echo "Debug: TMAS_API_KEY = $TMAS_API_KEY"
 
