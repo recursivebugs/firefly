@@ -41,7 +41,7 @@ jobs:
 
       # Scan Docker image for malware
       - name: Scan Docker image for malware
-        run: tmas scan docker-archive:nginx-welcome.tar -VSM > scan-results.txt
+        run: tmas scan docker-archive:nginx-welcome.tar -M > scan-results.txt
 
       # Upload the scan results as an artifact
       - name: Upload scan results as artifact
