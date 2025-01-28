@@ -6,76 +6,127 @@ on:
       - main
 
 jobs:
+  #####################################################################
+  # 1) BUILD JOB
+  #####################################################################
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/nginx-welcome:latest .
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/nginx-welcome:latest .
+
       - name: Save Docker image as tarball
-        run: docker save ${{ secrets.DOCKER_USERNAME }}/nginx-welcome:latest -o nginx-welcome.tar
-      - uses: actions/upload-artifact@v3
+        run: |
+          docker save ${{ secrets.DOCKER_USERNAME }}/nginx-welcome:latest -o nginx-welcome.tar
+
+      - name: Upload Docker image tarball
+        uses: actions/upload-artifact@v3
         with:
           name: docker-image
           path: nginx-welcome.tar
 
+  #####################################################################
+  # 2) VULNERABILITIES + SBOM SCAN
+  #####################################################################
   vulnerabilities-scan:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .
-      - run: ./tmas_install.sh
-      - run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Install Artifact Scan CLI
+        run: ./tmas_install.sh
+
+      - name: Set TMAS_API_KEY environment variable
+        run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      # (a) Scan for vulnerabilities & produce SBOM
       - name: Scan Docker image for Vulnerabilities + SBOM
         run: tmas scan docker-archive:nginx-welcome.tar -V --saveSBOM > vulnerability-scan-results.txt
+
+      # (b) Parse & fail if any critical vulnerabilities
       - name: Parse & fail if critical vulnerabilities
         run: |
-          sudo apt-get update && sudo apt-get install -y jq
+          sudo apt-get update -y && sudo apt-get install -y jq
           CRITICAL=$(jq '.vulnerabilities.criticalCount' vulnerability-scan-results.txt)
           echo "Critical vulnerabilities: $CRITICAL"
+
+          # If CRITICAL > 0, fail the job
           if [ "$CRITICAL" -gt 0 ]; then
             echo "Critical vulnerabilities found! Failing pipeline..."
             exit 1
           fi
+
+      # (c) Always upload logs / SBOM (even if the previous step fails)
       - name: Upload vulnerability scan results
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: vulnerability-scan-results
           path: vulnerability-scan-results.txt
-      - name: Upload SBOM
+
+      - name: Upload SBOM file
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: sbom-report
           path: SBOM_*.json
 
+  #####################################################################
+  # 3) MALWARE SCAN
+  #####################################################################
   malware-scan:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .
-      - run: ./tmas_install.sh
-      - run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Install Artifact Scan CLI
+        run: ./tmas_install.sh
+
+      - name: Set TMAS_API_KEY environment variable
+        run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      # (a) Run malware scan
       - name: Scan Docker image for Malware
         run: tmas scan docker-archive:nginx-welcome.tar -M > malware-scan-results.txt
-      - name: Parse & fail if malware found
+
+      # (b) Parse details & fail if any malware is found
+      - name: Parse & fail if malware is found
         run: |
-          sudo apt-get update && sudo apt-get install -y jq
-          CODE=$(jq '.malware.scanResult' malware-scan-results.txt)
-          echo "Malware scan result code: $CODE"
-          if [ "$CODE" -gt 0 ]; then
+          sudo apt-get update -y && sudo apt-get install -y jq
+
+          MALWARE_CODE=$(jq '.malware.scanResult' malware-scan-results.txt)
+          echo "Malware scan result code: $MALWARE_CODE"
+
+          if [ "$MALWARE_CODE" -gt 0 ]; then
+            echo "=== MALWARE DETAILS ==="
+            # Print each detected malware name and file
+            jq -r '.malware.findings[]?.foundMalwares[]? | "* Detected: \(.malwareName) in file: \(.fileName)"' malware-scan-results.txt
+
             echo "Malware detected! Failing pipeline..."
             exit 1
           fi
+
+      # (c) Always upload logs
       - name: Upload malware scan results
         if: always()
         uses: actions/upload-artifact@v3
@@ -83,28 +134,49 @@ jobs:
           name: malware-scan-results
           path: malware-scan-results.txt
 
+  #####################################################################
+  # 4) SECRETS SCAN
+  #####################################################################
   secrets-scan:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .
-      - run: ./tmas_install.sh
-      - run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Install Artifact Scan CLI
+        run: ./tmas_install.sh
+
+      - name: Set TMAS_API_KEY environment variable
+        run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      # (a) Scan for secrets
       - name: Scan Docker image for Secrets
         run: tmas scan docker-archive:nginx-welcome.tar -S > secrets-scan-results.txt
+
+      # (b) Parse & fail if secrets found
       - name: Parse & fail if secrets found
         run: |
-          sudo apt-get update && sudo apt-get install -y jq
-          COUNT=$(jq '.secrets.unmitigatedFindingsCount' secrets-scan-results.txt)
-          echo "Secrets found: $COUNT"
-          if [ "$COUNT" -gt 0 ]; then
+          sudo apt-get update -y && sudo apt-get install -y jq
+          SECRETS_COUNT=$(jq '.secrets.unmitigatedFindingsCount' secrets-scan-results.txt)
+          echo "Secrets found: $SECRETS_COUNT"
+
+          # (Optional) Print more details about each secret:
+          echo "=== SECRET DETAILS ==="
+          jq -r '.secrets.findings.unmitigated[]? | "* Rule:\(.ruleID) in file:\(.location.path) lines:\(.location.startLine)-\(.location.endLine)"' secrets-scan-results.txt
+
+          if [ "$SECRETS_COUNT" -gt 0 ]; then
             echo "Secrets detected! Failing pipeline..."
             exit 1
           fi
+
+      # (c) Always upload secrets logs
       - name: Upload secrets scan results
         if: always()
         uses: actions/upload-artifact@v3
@@ -112,6 +184,9 @@ jobs:
           name: secrets-scan-results
           path: secrets-scan-results.txt
 
+  #####################################################################
+  # 5) PUSH IMAGE
+  #####################################################################
   push-image:
     needs:
       - vulnerabilities-scan
@@ -119,14 +194,23 @@ jobs:
       - secrets-scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .
-      - run: docker load --input nginx-welcome.tar
-      - uses: docker/login-action@v2
+
+      - name: Load Docker image
+        run: docker load --input nginx-welcome.tar
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - run: docker push ${{ secrets.DOCKER_USERNAME }}/nginx-welcome:latest
+
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/nginx-welcome:latest
