@@ -29,6 +29,7 @@ jobs:
           name: docker-image
           path: nginx-welcome.tar
 
+
   #####################################################################
   # 2) VULNERABILITIES + SBOM SCAN
   #####################################################################
@@ -53,13 +54,13 @@ jobs:
 
       # (a) Scan for vulnerabilities & produce SBOM
       - name: Scan Docker image for Vulnerabilities + SBOM
-        run: tmas scan docker-archive:nginx-welcome.tar -V --saveSBOM > vulnerability-scan-results.txt
+        run: tmas scan docker-archive:nginx-welcome.tar -V --saveSBOM > vulnerability-scan-results.json
 
       # (b) Parse & fail if any critical vulnerabilities
       - name: Parse & fail if critical vulnerabilities
         run: |
           sudo apt-get update -y && sudo apt-get install -y jq
-          CRITICAL=$(jq '.vulnerabilities.criticalCount' vulnerability-scan-results.txt)
+          CRITICAL=$(jq '.vulnerabilities.criticalCount' vulnerability-scan-results.json)
           echo "Critical vulnerabilities: $CRITICAL"
 
           # If CRITICAL > 0, fail the job
@@ -74,7 +75,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: vulnerability-scan-results
-          path: vulnerability-scan-results.txt
+          path: vulnerability-scan-results.json
 
       - name: Upload SBOM file
         if: always()
@@ -82,6 +83,7 @@ jobs:
         with:
           name: sbom-report
           path: SBOM_*.json
+
 
   #####################################################################
   # 3) MALWARE SCAN
@@ -107,20 +109,24 @@ jobs:
 
       # (a) Run malware scan
       - name: Scan Docker image for Malware
-        run: tmas scan docker-archive:nginx-welcome.tar -M > malware-scan-results.txt
+        run: tmas scan docker-archive:nginx-welcome.tar -M > malware-scan-results.json
 
       # (b) Parse details & fail if any malware is found
       - name: Parse & fail if malware is found
         run: |
           sudo apt-get update -y && sudo apt-get install -y jq
-
-          MALWARE_CODE=$(jq '.malware.scanResult' malware-scan-results.txt)
+          MALWARE_CODE=$(jq '.malware.scanResult' malware-scan-results.json)
           echo "Malware scan result code: $MALWARE_CODE"
 
+          # If code > 0, print details & fail
           if [ "$MALWARE_CODE" -gt 0 ]; then
             echo "=== MALWARE DETAILS ==="
-            # Print each detected malware name and file
-            jq -r '.malware.findings[]?.foundMalwares[]? | "* Detected: \(.malwareName) in file: \(.fileName)"' malware-scan-results.txt
+            # Print top-level fileName & sub-fileName for each detected item
+            jq -r '
+              .malware.findings[]? as $finding |
+              $finding.foundMalwares[]? as $mal |
+              "* Detected: \($mal.malwareName) in main file: \($finding.fileName) (sub-file: \($mal.fileName))"
+            ' malware-scan-results.json
 
             echo "Malware detected! Failing pipeline..."
             exit 1
@@ -132,7 +138,8 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: malware-scan-results
-          path: malware-scan-results.txt
+          path: malware-scan-results.json
+
 
   #####################################################################
   # 4) SECRETS SCAN
@@ -158,18 +165,21 @@ jobs:
 
       # (a) Scan for secrets
       - name: Scan Docker image for Secrets
-        run: tmas scan docker-archive:nginx-welcome.tar -S > secrets-scan-results.txt
+        run: tmas scan docker-archive:nginx-welcome.tar -S > secrets-scan-results.json
 
       # (b) Parse & fail if secrets found
       - name: Parse & fail if secrets found
         run: |
           sudo apt-get update -y && sudo apt-get install -y jq
-          SECRETS_COUNT=$(jq '.secrets.unmitigatedFindingsCount' secrets-scan-results.txt)
+          SECRETS_COUNT=$(jq '.secrets.unmitigatedFindingsCount' secrets-scan-results.json)
           echo "Secrets found: $SECRETS_COUNT"
 
-          # (Optional) Print more details about each secret:
+          # (Optional) Print more details about each secret
           echo "=== SECRET DETAILS ==="
-          jq -r '.secrets.findings.unmitigated[]? | "* Rule:\(.ruleID) in file:\(.location.path) lines:\(.location.startLine)-\(.location.endLine)"' secrets-scan-results.txt
+          jq -r '
+            .secrets.findings.unmitigated[]? |
+            "* Rule: \(.ruleID) in file: \(.location.path) lines: \(.location.startLine)-\(.location.endLine)"
+          ' secrets-scan-results.json
 
           if [ "$SECRETS_COUNT" -gt 0 ]; then
             echo "Secrets detected! Failing pipeline..."
@@ -182,7 +192,8 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: secrets-scan-results
-          path: secrets-scan-results.txt
+          path: secrets-scan-results.json
+
 
   #####################################################################
   # 5) PUSH IMAGE
