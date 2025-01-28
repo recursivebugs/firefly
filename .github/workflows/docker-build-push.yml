@@ -1,46 +1,41 @@
-name: Build and Conditionally Run Security Scans
+name: Build with Conditional Security Scans
 
 on:
   push:
     branches:
       - main
 
-# Global environment variable controlling security scans
-env:
-  SECURITY_ENABLED: "false"  # or "false" to disable all scanning
-
 jobs:
-  ####################################################################
+  ###################################################################
   # 1) BUILD JOB
-  ####################################################################
+  ###################################################################
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Build Docker image
         run: docker build -t fafiorim/firefly:latest .
 
-      - name: Save Docker image as tarball
+      - name: Save Docker image
         run: docker save fafiorim/firefly:latest -o firefly.tar
 
-      - name: Upload Docker image tarball
+      - name: Upload Docker image artifact
         uses: actions/upload-artifact@v3
         with:
           name: docker-image
           path: firefly.tar
 
-  ####################################################################
+  ###################################################################
   # 2) VULNERABILITY SCAN
-  ####################################################################
+  ###################################################################
   vulnerabilities-scan:
-    # This job only runs if SECURITY_ENABLED == 'true'
-    if: ${{ env.SECURITY_ENABLED == 'true' }}
+    if: ${{ secrets.SECURITY_ENABLED != 'false' }}
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Download Docker artifact
@@ -75,15 +70,15 @@ jobs:
           name: vulnerability-scan-results
           path: vulnerability-scan-results.json
 
-  ####################################################################
+  ###################################################################
   # 3) MALWARE SCAN
-  ####################################################################
+  ###################################################################
   malware-scan:
-    if: ${{ env.SECURITY_ENABLED == 'true' }}
+    if: ${{ secrets.SECURITY_ENABLED != 'false' }}
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Download Docker artifact
@@ -98,16 +93,16 @@ jobs:
       - name: Set TMAS_API_KEY
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
-      - name: Scan Docker image for Malware
+      - name: Scan for Malware
         run: tmas scan docker-archive:firefly.tar -M > malware-scan-results.json
 
       - name: Fail if malware is found
         run: |
           sudo apt-get update -y && sudo apt-get install -y jq
-          MALWARE_CODE=$(jq '.malware.scanResult' malware-scan-results.json)
-          echo "Malware scan result code: $MALWARE_CODE"
-          if [ "$MALWARE_CODE" -gt 0 ]; then
-            echo "Malware found! Failing pipeline..."
+          CODE=$(jq '.malware.scanResult' malware-scan-results.json)
+          echo "Malware scan result code: $CODE"
+          if [ "$CODE" -gt 0 ]; then
+            echo "Malware detected! Failing..."
             exit 1
           fi
 
@@ -118,15 +113,15 @@ jobs:
           name: malware-scan-results
           path: malware-scan-results.json
 
-  ####################################################################
+  ###################################################################
   # 4) SECRETS SCAN
-  ####################################################################
+  ###################################################################
   secrets-scan:
-    if: ${{ env.SECURITY_ENABLED == 'true' }}
+    if: ${{ secrets.SECURITY_ENABLED != 'false' }}
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Download Docker artifact
@@ -141,15 +136,14 @@ jobs:
       - name: Set TMAS_API_KEY
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
-      - name: Scan Docker image for Secrets
+      - name: Scan for Secrets
         run: tmas scan docker-archive:firefly.tar -S > secrets-scan-results.json
 
       - name: Fail if secrets found
         run: |
           sudo apt-get update -y && sudo apt-get install -y jq
-          SECRETS_COUNT=$(jq '.secrets.unmitigatedFindingsCount' secrets-scan-results.json)
-          echo "Secrets found: $SECRETS_COUNT"
-          if [ "$SECRETS_COUNT" -gt 0 ]; then
+          COUNT=$(jq '.secrets.unmitigatedFindingsCount' secrets-scan-results.json)
+          if [ "$COUNT" -gt 0 ]; then
             echo "Secrets detected! Failing pipeline..."
             exit 1
           fi
@@ -161,15 +155,15 @@ jobs:
           name: secrets-scan-results
           path: secrets-scan-results.json
 
-  ####################################################################
-  # 5) SBOM SCAN (OPTIONAL)
-  ####################################################################
+  ###################################################################
+  # 5) SBOM SCAN (optional)
+  ###################################################################
   sbom-scan:
-    if: ${{ env.SECURITY_ENABLED == 'true' }}
+    if: ${{ secrets.SECURITY_ENABLED != 'false' }}
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Download Docker artifact
@@ -201,21 +195,20 @@ jobs:
           name: sbom-report
           path: SBOM_*.json
 
-  ####################################################################
-  # 6) PUSH IMAGE
-  ####################################################################
+  ###################################################################
+  # 6) PUSH JOB
+  ###################################################################
   push-image:
     needs:
       - build
-      # If you want the pipeline to pass even if security is disabled, do NOT add the scanning jobs to 'needs'.
-      # If you want to fail if scans are forced but security is enabled, add them to 'needs':
+      # If you want to require scanning to pass if it's enabled, add them here:
       - malware-scan
       - secrets-scan
-      # 'vulnerabilities-scan'
-      # 'sbom-scan'
+      # - vulnerabilities-scan
+      # - sbom-scan
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Download Docker artifact
