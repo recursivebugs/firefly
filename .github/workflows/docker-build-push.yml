@@ -203,6 +203,8 @@ jobs:
       - build
       - malware-scan
       - secrets-scan
+      - vulnerabilities-scan
+      - sbom-scan
       # add "vulnerabilities-scan" or "sbom-scan" if you want them to block push
     runs-on: ubuntu-latest
     steps:
