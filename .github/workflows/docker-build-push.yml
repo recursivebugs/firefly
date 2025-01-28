@@ -31,7 +31,7 @@ jobs:
 
 
   #####################################################################
-  # 2) VULNERABILITIES + SBOM SCAN
+  # 2) VULNERABILITY SCAN (no SBOM)
   #####################################################################
   vulnerabilities-scan:
     needs: build
@@ -52,9 +52,9 @@ jobs:
       - name: Set TMAS_API_KEY environment variable
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
-      # (a) Scan for vulnerabilities & produce SBOM
-      - name: Scan Docker image for Vulnerabilities + SBOM
-        run: tmas scan docker-archive:nginx-welcome.tar -V --saveSBOM > vulnerability-scan-results.json
+      # (a) Scan for vulnerabilities (without --saveSBOM)
+      - name: Scan Docker image for Vulnerabilities
+        run: tmas scan docker-archive:nginx-welcome.tar -V > vulnerability-scan-results.json
 
       # (b) Parse & fail if any critical vulnerabilities
       - name: Parse & fail if critical vulnerabilities
@@ -69,13 +69,47 @@ jobs:
             exit 1
           fi
 
-      # (c) Always upload logs / SBOM (even if the previous step fails)
+      # (c) Always upload logs (even if fail)
       - name: Upload vulnerability scan results
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: vulnerability-scan-results
           path: vulnerability-scan-results.json
+
+
+  #####################################################################
+  # 3) SBOM SCAN (separate job for SBOM generation)
+  #####################################################################
+  sbom-scan:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-image
+          path: .
+
+      - name: Install Artifact Scan CLI
+        run: ./tmas_install.sh
+
+      - name: Set TMAS_API_KEY environment variable
+        run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      # Generate SBOM (we won't fail the pipeline if vulnerabilities appear here)
+      - name: Generate SBOM
+        run: tmas scan docker-archive:nginx-welcome.tar -V --saveSBOM > sbom-scan-results.json
+
+      - name: Upload SBOM results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-scan-results
+          path: sbom-scan-results.json
 
       - name: Upload SBOM file
         if: always()
@@ -84,9 +118,8 @@ jobs:
           name: sbom-report
           path: SBOM_*.json
 
-
   #####################################################################
-  # 3) MALWARE SCAN
+  # 4) MALWARE SCAN
   #####################################################################
   malware-scan:
     needs: build
@@ -118,10 +151,9 @@ jobs:
           MALWARE_CODE=$(jq '.malware.scanResult' malware-scan-results.json)
           echo "Malware scan result code: $MALWARE_CODE"
 
-          # If code > 0, print details & fail
           if [ "$MALWARE_CODE" -gt 0 ]; then
             echo "=== MALWARE DETAILS ==="
-            # Print top-level fileName & sub-fileName for each detected item
+            # Show top-level fileName & sub-fileName
             jq -r '
               .malware.findings[]? as $finding |
               $finding.foundMalwares[]? as $mal |
@@ -142,7 +174,7 @@ jobs:
 
 
   #####################################################################
-  # 4) SECRETS SCAN
+  # 5) SECRETS SCAN
   #####################################################################
   secrets-scan:
     needs: build
@@ -174,7 +206,6 @@ jobs:
           SECRETS_COUNT=$(jq '.secrets.unmitigatedFindingsCount' secrets-scan-results.json)
           echo "Secrets found: $SECRETS_COUNT"
 
-          # (Optional) Print more details about each secret
           echo "=== SECRET DETAILS ==="
           jq -r '
             .secrets.findings.unmitigated[]? |
@@ -186,7 +217,7 @@ jobs:
             exit 1
           fi
 
-      # (c) Always upload secrets logs
+      # (c) Always upload logs
       - name: Upload secrets scan results
         if: always()
         uses: actions/upload-artifact@v3
@@ -196,9 +227,11 @@ jobs:
 
 
   #####################################################################
-  # 5) PUSH IMAGE
+  # 6) PUSH IMAGE
   #####################################################################
   push-image:
+    # By default, only require vulnerabilities-scan, malware-scan, secrets-scan
+    # (NOT sbom-scan). If you want to wait for sbom-scan to finish, add it below:
     needs:
       - vulnerabilities-scan
       - malware-scan
