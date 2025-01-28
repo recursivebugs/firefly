@@ -5,7 +5,7 @@ FROM nginx:alpine
 # RUN echo "X5O!P%@AP[4\\PZX54(P^)7CC)7}\$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!\$H+H*" > /tmp/eicar.com
 
 #If want to test for Secret scanning:
-RUN echo "a3b5c7d8e9f0123456789abcdef01234" > /tmp/token
+RUN echo "6a7c8e2f3b5d4a1f9c0d8b6e3f7a2c5e3d1a4b7c" > /tmp/token
 
 # (Optional) Install anything you need inside the container
 RUN apk update && apk add --no-cache curl
