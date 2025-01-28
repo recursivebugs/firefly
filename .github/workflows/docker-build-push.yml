@@ -46,6 +46,7 @@ jobs:
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
       - name: Scan Docker image for Vulnerabilities + SBOM
+        # The --saveSBOM flag generates a file named SBOM_*.json
         run: tmas scan docker-archive:nginx-welcome.tar -V --saveSBOM > vulnerability-scan-results.txt
 
       - name: Upload vulnerability scan results
@@ -53,6 +54,13 @@ jobs:
         with:
           name: vulnerability-scan-results
           path: vulnerability-scan-results.txt
+
+      # This step uploads the generated SBOM JSON (SBOM_*.json)
+      - name: Upload SBOM file
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-report
+          path: SBOM_*.json
 
   malware-scan:
     needs: build
