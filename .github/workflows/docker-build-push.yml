@@ -156,7 +156,7 @@ jobs:
           path: secrets-scan-results.json
 
   ###################################################################
-  # 5) SBOM SCAN
+  # 5) SBOM SCAN (Optional)
   ###################################################################
   sbom-scan:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
@@ -198,33 +198,36 @@ jobs:
   ###################################################################
   # 6) PUSH IMAGE
   ###################################################################
-  push-image:
-    needs:
-      - build
-      - malware-scan
-      - secrets-scan
-      - vulnerabilities-scan
-      - sbom-scan
-      # add "vulnerabilities-scan" or "sbom-scan" if you want them to block push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+push-image:
+  needs:
+    - build
+    - vulnerabilities-scan
+    - malware-scan
+    - secrets-scan
+    - sbom-scan
 
-      - name: Download Docker artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: docker-image
-          path: .
+  # Use a single-line expression to avoid YAML parsing errors
+  if: ${{ always() && needs.vulnerabilities-scan.result != 'failure' && needs.malware-scan.result != 'failure' && needs.secrets-scan.result != 'failure' }}
 
-      - name: Load Docker image
-        run: docker load --input firefly.tar
+  runs-on: ubuntu-latest
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Download Docker artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-image
+        path: .
 
-      - name: Push Docker image
-        run: docker push fafiorim/firefly:latest
+    - name: Load Docker image
+      run: docker load --input firefly.tar
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Push Docker image
+      run: docker push fafiorim/firefly:latest
