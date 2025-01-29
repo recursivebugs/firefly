@@ -28,189 +28,203 @@ jobs:
           path: firefly.tar
 
   ###################################################################
-  # 2) SECURITY SCAN (Vulnerabilities, Malware, Secrets, SBOM)
+  # 2) VULNERABILITY SCAN
   ###################################################################
-  security-scan:
+  vulnerabilities-scan:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Download Docker Image
+      - name: Download Docker artifact
         uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .
 
       - name: Install Artifact Scan CLI
-        run: |
-          chmod +x ./tmas_install.sh
-          ./tmas_install.sh
+        run: ./tmas_install.sh
 
       - name: Set TMAS_API_KEY
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
-      - name: Run Security Scan
-        run: |
-          tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
-          ls -l SBOM_*.json || true
+      - name: Scan for Vulnerabilities
+        run: tmas scan docker-archive:firefly.tar -V > vulnerability-scan-results.json
 
-      - name: Move SBOM File If Exists
+      - name: Fail if critical vulnerabilities
         run: |
-          SBOM_FILE=$(ls SBOM_*.json 2>/dev/null | head -n 1 || echo "")
-          if [ -n "$SBOM_FILE" ]; then
-            mv "$SBOM_FILE" sbom-scan-results.json
-          else
-            echo "No SBOM file found!"
+          sudo apt-get update -y && sudo apt-get install -y jq
+          CRITICAL=$(jq '.vulnerabilities.criticalCount' vulnerability-scan-results.json)
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "Critical vulnerabilities found! Failing..."
+            exit 1
           fi
 
-      - name: Upload Scan Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: scan-results
-          path: scan-results.json
-
-      - name: Upload SBOM Results
+      - name: Upload vulnerability logs
         if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: sbom-scan-results
-          path: sbom-scan-results.json
-
-  ###################################################################
-  # 3) PARSE SCAN RESULTS
-  ###################################################################
-  parse-scan-results:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
-    needs: security-scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Scan Results
-        uses: actions/download-artifact@v3
-        with:
-          name: scan-results
-          path: .
-
-      - name: Install JQ for JSON Parsing
-        run: sudo apt-get update -y && sudo apt-get install -y jq
-
-      - name: Parse Vulnerabilities
-        run: jq '{ vulnerabilities: .vulnerabilities }' scan-results.json > vulnerability-scan-results.json
-
-      - name: Parse Malware
-        run: jq '{ malware: .malware }' scan-results.json > malware-scan-results.json
-
-      - name: Parse Secrets
-        run: jq '{ secrets: .secrets }' scan-results.json > secret-scan-results.json
-
-      - name: Upload Parsed Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: parsed-results
-          path: |
-            vulnerability-scan-results.json
-            malware-scan-results.json
-            secret-scan-results.json
-
-  ###################################################################
-  # 4) UPLOAD VULNERABILITY SCAN RESULTS
-  ###################################################################
-  upload-vulnerability-results:
-    needs: parse-scan-results
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Parsed Results
-        uses: actions/download-artifact@v3
-        with:
-          name: parsed-results
-          path: .
-
-      - name: Upload Vulnerability Scan Results
         uses: actions/upload-artifact@v3
         with:
           name: vulnerability-scan-results
           path: vulnerability-scan-results.json
 
   ###################################################################
-  # 5) UPLOAD MALWARE SCAN RESULTS
+  # 3) MALWARE SCAN
   ###################################################################
-  upload-malware-results:
-    needs: parse-scan-results
+  malware-scan:
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download Parsed Results
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download Docker artifact
         uses: actions/download-artifact@v3
         with:
-          name: parsed-results
+          name: docker-image
           path: .
 
-      - name: Upload Malware Scan Results
+      - name: Install Artifact Scan CLI
+        run: ./tmas_install.sh
+
+      - name: Set TMAS_API_KEY
+        run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Scan for Malware
+        run: tmas scan docker-archive:firefly.tar -M > malware-scan-results.json
+
+      - name: Fail if malware is found
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y jq
+          CODE=$(jq '.malware.scanResult' malware-scan-results.json)
+          if [ "$CODE" -gt 0 ]; then
+            echo "Malware detected! Failing..."
+            exit 1
+          fi
+
+      - name: Upload malware logs
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: malware-scan-results
           path: malware-scan-results.json
 
   ###################################################################
-  # 6) UPLOAD SECRETS SCAN RESULTS
+  # 4) SECRETS SCAN
   ###################################################################
-  upload-secrets-results:
-    needs: parse-scan-results
+  secrets-scan:
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download Parsed Results
-        uses: actions/download-artifact@v3
-        with:
-          name: parsed-results
-          path: .
-
-      - name: Upload Secrets Scan Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: secrets-scan-results
-          path: secret-scan-results.json
-
-  ###################################################################
-  # 7) UPLOAD SBOM RESULTS
-  ###################################################################
-  upload-sbom-results:
-    needs: security-scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download SBOM Scan Results
-        uses: actions/download-artifact@v3
-        with:
-          name: sbom-scan-results
-          path: .
-
-      - name: Upload SBOM Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: sbom-scan-results
-          path: sbom-scan-results.json
-
-  ###################################################################
-  # 8) PUSH IMAGE (Only if Scans Pass)
-  ###################################################################
-  push-image:
-    needs:
-      - upload-vulnerability-results
-      - upload-malware-results
-      - upload-secrets-results
-      - upload-sbom-results
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Download Docker Artifact
+      - name: Download Docker artifact
         uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .
 
-      - name: Load Docker Image
+      - name: Install Artifact Scan CLI
+        run: ./tmas_install.sh
+
+      - name: Set TMAS_API_KEY
+        run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Scan for Secrets
+        run: tmas scan docker-archive:firefly.tar -S > secrets-scan-results.json
+
+      - name: Fail if secrets found
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y jq
+
+          SECRETS_COUNT=$(jq '.secrets.unmitigatedFindingsCount' secrets-scan-results.json)
+          echo "Secrets found: $SECRETS_COUNT"
+
+          echo "=== SECRET DETAILS ==="
+          jq -r '.secrets.findings.unmitigated[]? | "* Rule: \(.ruleID) | Path: \(.location.path)"' secrets-scan-results.json
+
+          if [ "$SECRETS_COUNT" -gt 0 ]; then
+            echo "Secrets detected! Failing..."
+            exit 1
+          fi
+
+      - name: Upload secrets logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: secrets-scan-results
+          path: secrets-scan-results.json
+
+  ###################################################################
+  # 5) SBOM SCAN (Optional)
+  ###################################################################
+  sbom-scan:
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download Docker artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-image
+          path: .
+
+      - name: Install Artifact Scan CLI
+        run: ./tmas_install.sh
+
+      - name: Set TMAS_API_KEY
+        run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Generate SBOM
+        run: tmas scan docker-archive:firefly.tar -V --saveSBOM > sbom-scan-results.json
+
+      - name: Upload SBOM logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-scan-results
+          path: sbom-scan-results.json
+
+      - name: Upload SBOM file
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-report
+          path: SBOM_*.json
+
+  ###################################################################
+  # 6) PUSH IMAGE
+  ###################################################################
+  push-image:
+    needs:
+      - build
+      - vulnerabilities-scan
+      - malware-scan
+      - secrets-scan
+      - sbom-scan
+
+    # Single-line expression to avoid YAML parsing issues
+    if: ${{ always() && needs.vulnerabilities-scan.result != 'failure' && needs.malware-scan.result != 'failure' && needs.secrets-scan.result != 'failure' && needs.sbom-scan.result != 'failure' }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download Docker artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-image
+          path: .
+
+      - name: Load Docker image
         run: docker load --input firefly.tar
 
       - name: Log in to Docker Hub
@@ -219,5 +233,5 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Push Docker Image
+      - name: Push Docker image
         run: docker push fafiorim/firefly:latest
