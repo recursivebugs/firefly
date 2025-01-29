@@ -254,11 +254,18 @@ jobs:
   # 8) PUSH IMAGE
   ###################################################################
   push-image:
-    needs:
-      - vulnerability-scanner
-      - malware-scanner
-      - secrets-scanner
-      - sbom-scanner
+    needs: [build]
+    if: |
+      success() &&
+      (
+        vars.SECURITY_ENABLED == 'false' ||
+        (
+          needs.vulnerability-scanner.result == 'success' &&
+          needs.malware-scanner.result == 'success' &&
+          needs.secrets-scanner.result == 'success' &&
+          needs.sbom-scanner.result == 'success'
+        )
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
