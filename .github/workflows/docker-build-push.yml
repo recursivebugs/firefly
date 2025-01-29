@@ -28,7 +28,7 @@ jobs:
           path: firefly.tar
 
   ###################################################################
-  # 2) FULL SECURITY SCAN
+  # 2) SECURITY SCAN
   ###################################################################
   security-scan:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
@@ -53,6 +53,15 @@ jobs:
       - name: Run Full Security Scan
         run: tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
 
+      - name: Debug - Check if scan-results.json Exists
+        run: ls -l scan-results.json
+
+      - name: Upload Scan Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: scan-results
+          path: scan-results.json
+
   ###################################################################
   # 3) PARSE SCAN RESULTS
   ###################################################################
@@ -66,6 +75,9 @@ jobs:
         with:
           name: scan-results
           path: .
+
+      - name: Debug - Check Scan Results File
+        run: ls -l scan-results.json
 
       - name: Parse Vulnerabilities
         run: |
@@ -118,7 +130,7 @@ jobs:
       - name: Upload Secrets Scan Results
         uses: actions/upload-artifact@v3
         with:
-          name: secret-scan-results
+          name: secrets-scan-results
           path: secret-scan-results.json
 
   ###################################################################
@@ -128,7 +140,7 @@ jobs:
     needs: security-scan
     runs-on: ubuntu-latest
     steps:
-      - name: Upload SBOM File
+      - name: Upload SBOM Results
         uses: actions/upload-artifact@v3
         with:
           name: sbom-report
@@ -139,13 +151,10 @@ jobs:
   ###################################################################
   push-image:
     needs:
-      - parse-scan-results
       - upload-vulnerability-results
       - upload-malware-results
       - upload-secrets-results
       - upload-sbom
-
-    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
