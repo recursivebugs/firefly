@@ -87,13 +87,11 @@ jobs:
           tmas scan docker-archive:firefly.tar -VMS --saveSBOM 2>&1 | tee tmas_output.log > scan-results.json
           
           # Create clean summary
-          cat << EOF > $GITHUB_STEP_SUMMARY
-=== Security Scan Summary ===
-Scanned Image: fafiorim/firefly:latest
-Archive Hash (firefly.tar): sha256:$TAR_HASH
-Scan Results: scan-results.json
-SBOM Generated: true
-EOF
+          echo "=== Security Scan Summary ===" > $GITHUB_STEP_SUMMARY
+          echo "Scanned Image: fafiorim/firefly:latest" >> $GITHUB_STEP_SUMMARY
+          echo "Archive Hash (firefly.tar): sha256:$TAR_HASH" >> $GITHUB_STEP_SUMMARY
+          echo "Scan Results: scan-results.json" >> $GITHUB_STEP_SUMMARY
+          echo "SBOM Generated: true" >> $GITHUB_STEP_SUMMARY
 
       - name: Debug - List Files
         run: ls -la
