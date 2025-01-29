@@ -22,7 +22,7 @@ jobs:
         run: docker save fafiorim/firefly:latest -o firefly.tar
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: firefly.tar
@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download Docker artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: .
@@ -57,7 +57,7 @@ jobs:
         run: ls -la
 
       - name: Upload Scan Results and SBOM
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: all-scan-results
           path: |
@@ -74,7 +74,7 @@ jobs:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Scan Results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: all-scan-results
           path: .
@@ -89,7 +89,7 @@ jobs:
           jq '{ secrets: .secrets }' scan-results.json > secret-scan-results.json
 
       - name: Upload Parsed Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: parsed-results
           path: |
@@ -106,7 +106,7 @@ jobs:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: parsed-results
           path: .
@@ -135,7 +135,7 @@ jobs:
 
       - name: Upload Vulnerability Results
         if: success() || failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vulnerability-scan-results
           path: vulnerability-scan-results.json
@@ -149,7 +149,7 @@ jobs:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: parsed-results
           path: .
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload Malware Results
         if: success() || failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: malware-scan-results
           path: malware-scan-results.json
@@ -187,7 +187,7 @@ jobs:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: parsed-results
           path: .
@@ -216,7 +216,7 @@ jobs:
 
       - name: Upload Secrets Results
         if: success() || failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: secrets-scan-results
           path: secret-scan-results.json
@@ -230,7 +230,7 @@ jobs:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download All Results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: all-scan-results
           path: .
@@ -242,7 +242,7 @@ jobs:
           find . -name "SBOM_*.json" || echo "No SBOM files found"
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sbom-results
           path: |
@@ -279,7 +279,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download Docker artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: .
