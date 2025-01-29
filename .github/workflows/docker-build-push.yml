@@ -45,21 +45,24 @@ jobs:
           path: .
 
       - name: Install Artifact Scan CLI
-        run: ./tmas_install.sh
+        run: |
+          chmod +x ./tmas_install.sh
+          ./tmas_install.sh
 
       - name: Set TMAS_API_KEY
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
       - name: Run Full Security Scan (Vulnerability, Malware, Secrets, SBOM)
-        run: tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
-
-      - name: Find SBOM File
         run: |
-          SBOM_FILE=$(ls SBOM_*.json 2>/dev/null | head -n 1)
+          tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
+          ls -l SBOM_*.json || true
+
+      - name: Move SBOM file if exists
+        run: |
+          SBOM_FILE=$(ls SBOM_*.json 2>/dev/null | head -n 1 || echo "")
           if [ -z "$SBOM_FILE" ]; then
             echo "No SBOM file found!" && exit 1
           fi
-          echo "SBOM file found: $SBOM_FILE"
           mv "$SBOM_FILE" sbom-scan-results.json
 
       - name: Upload Scan Results
