@@ -1,6 +1,6 @@
 # Use the official NGINX image from Docker Hub
-FROM nginx:alpine
-
+#FROM nginx:alpine
+FROM ubuntu
 # If want to test the check for malware
 #RUN echo "X5O!P%@AP[4\\PZX54(P^)7CC)7}\$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!\$H+H*" > /tmp/eicar.com
 
