@@ -307,7 +307,5 @@ jobs:
           echo "Full Image Reference with Digest:" >> $GITHUB_STEP_SUMMARY
           echo "$DIGEST" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Example kubectl commands to deploy this image:" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
           # Set output for potential future use
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
