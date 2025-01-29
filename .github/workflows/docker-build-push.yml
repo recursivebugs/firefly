@@ -21,13 +21,15 @@ jobs:
           # Build the image and capture the output
           docker build -t fafiorim/firefly:latest . 2>&1 | tee build_output.log
           
-          # Extract the digest from the build output
-          BUILD_DIGEST=$(grep 'writing image sha256:' build_output.log | awk '{print $3}')
+          # Extract the complete digest from the build output
+          BUILD_DIGEST=$(grep 'writing image sha256:' build_output.log | sed -n 's/.*\(sha256:[a-f0-9]*\).*/\1/p')
           
           # Write build summary
-          echo "=== Docker Image Build Summary ===" >> $GITHUB_STEP_SUMMARY
-          echo "Image Name: fafiorim/firefly:latest" >> $GITHUB_STEP_SUMMARY
-          echo "Build Digest: $BUILD_DIGEST" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "=== Docker Image Build Summary ==="
+            echo "Image Name: fafiorim/firefly:latest"
+            echo "Build Digest: $BUILD_DIGEST"
+          } >> $GITHUB_STEP_SUMMARY
           
           # Save digest for later use
           echo "build_digest=$BUILD_DIGEST" >> $GITHUB_OUTPUT
