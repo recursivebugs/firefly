@@ -53,11 +53,17 @@ jobs:
       - name: Run Full Security Scan
         run: tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
 
-      - name: Upload Raw Scan Results
+      - name: Debug - List Files
+        run: ls -la
+
+      - name: Upload Scan Results and SBOM
         uses: actions/upload-artifact@v3
         with:
-          name: scan-results
-          path: scan-results.json
+          name: all-scan-results
+          path: |
+            scan-results.json
+            **/SBOM_*.json
+            ./SBOM_*.json
 
   ###################################################################
   # 3) PARSE SCAN RESULTS
@@ -70,7 +76,7 @@ jobs:
       - name: Download Scan Results
         uses: actions/download-artifact@v3
         with:
-          name: scan-results
+          name: all-scan-results
           path: .
 
       - name: Install jq
@@ -159,20 +165,26 @@ jobs:
     needs: security-scan
     runs-on: ubuntu-latest
     steps:
-      - name: Download Scan Results
+      - name: Download All Results
         uses: actions/download-artifact@v3
         with:
-          name: scan-results
+          name: all-scan-results
           path: .
 
-      - name: Check SBOM Files
-        run: ls -la SBOM_*.json || echo "No SBOM files found"
+      - name: Debug - List Files
+        run: |
+          pwd
+          ls -la
+          find . -name "SBOM_*.json" || echo "No SBOM files found"
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v3
         with:
           name: sbom-results
-          path: SBOM_*.json
+          path: |
+            **/SBOM_*.json
+            ./SBOM_*.json
+        continue-on-error: true
 
   ###################################################################
   # 8) PUSH IMAGE
