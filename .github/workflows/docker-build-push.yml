@@ -31,7 +31,7 @@ jobs:
   # 2) SECURITY SCAN (Vulnerabilities, Malware, Secrets, SBOM)
   ###################################################################
   security-scan:
-    if: vars.SECURITY_ENABLED != 'false'
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -83,7 +83,7 @@ jobs:
   # 3) PARSE SCAN RESULTS
   ###################################################################
   parse-scan-results:
-    if: vars.SECURITY_ENABLED != 'false'
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: security-scan
     runs-on: ubuntu-latest
     steps:
