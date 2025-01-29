@@ -80,6 +80,9 @@ jobs:
 
       - name: Run Full Security Scan
         run: |
+          # Calculate tar archive hash
+          TAR_HASH=$(sha256sum firefly.tar | cut -d' ' -f1)
+          
           # Run the scan and capture output
           tmas scan docker-archive:firefly.tar -VMS --saveSBOM 2>&1 | tee tmas_output.log > scan-results.json
           
@@ -91,6 +94,7 @@ jobs:
             echo "=== Security Scan Summary ==="
             echo "Scanned Image: fafiorim/firefly:latest"
             echo "Scan Digest: $SCAN_DIGEST"
+            echo "Archive Hash (firefly.tar): sha256:$TAR_HASH"
             echo "Scan Results: scan-results.json"
             echo "SBOM Generated: true"
           } > $GITHUB_STEP_SUMMARY
