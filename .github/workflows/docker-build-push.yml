@@ -19,7 +19,20 @@ jobs:
         run: docker build -t fafiorim/firefly:latest .
 
       - name: Save Docker image
-        run: docker save fafiorim/firefly:latest -o firefly.tar
+        run: |
+          # Save the image
+          docker save fafiorim/firefly:latest -o firefly.tar
+          
+          # Get image details
+          IMAGE_ID=$(docker images fafiorim/firefly:latest --format "{{.ID}}")
+          IMAGE_SIZE=$(docker images fafiorim/firefly:latest --format "{{.Size}}")
+          
+          # Write to step summary
+          echo "=== Docker Image Build Summary ===" >> $GITHUB_STEP_SUMMARY
+          echo "Image Name: fafiorim/firefly:latest" >> $GITHUB_STEP_SUMMARY
+          echo "Image ID: $IMAGE_ID" >> $GITHUB_STEP_SUMMARY
+          echo "Image Size: $IMAGE_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "Container Archive: firefly.tar" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
@@ -304,7 +317,13 @@ jobs:
           
           # Write to step summary
           echo "=== Docker Image Push Summary ===" >> $GITHUB_STEP_SUMMARY
-          echo "Full Image Reference with Digest:" >> $GITHUB_STEP_SUMMARY
+          echo "Container Archive Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- Filename: firefly.tar" >> $GITHUB_STEP_SUMMARY
+          echo "- Image Tag: fafiorim/firefly:latest" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Registry Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- Registry: docker.io" >> $GITHUB_STEP_SUMMARY
+          echo "- Full Image Reference with Digest:" >> $GITHUB_STEP_SUMMARY
           echo "$DIGEST" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Example kubectl commands to deploy this image:" >> $GITHUB_STEP_SUMMARY
