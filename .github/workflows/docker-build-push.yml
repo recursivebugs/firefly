@@ -28,7 +28,7 @@ jobs:
           path: firefly.tar
 
   ###################################################################
-  # 2) SECURITY SCAN (Generate scan results and SBOM)
+  # 2) SECURITY SCAN (Run all scans & SBOM generation)
   ###################################################################
   security-scan:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
@@ -50,7 +50,7 @@ jobs:
       - name: Set TMAS_API_KEY
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
-      - name: Run Full Security Scan (Vulnerability, Malware, Secrets)
+      - name: Run Full Security Scan (Vulnerability, Malware, Secrets, SBOM)
         run: tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
 
       - name: Upload Scan Results
@@ -87,12 +87,22 @@ jobs:
 
       - name: Find SBOM File
         run: |
-          SBOM_FILE=$(ls SBOM_*.json | head -n 1)
+          SBOM_FILE=$(ls SBOM_*.json 2>/dev/null | head -n 1)
           if [ -z "$SBOM_FILE" ]; then
             echo "No SBOM file found!" && exit 1
           fi
           echo "SBOM file found: $SBOM_FILE"
           mv "$SBOM_FILE" sbom-scan-results.json
+
+      - name: Upload Parsed Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: parsed-results
+          path: |
+            vulnerability-scan-results.json
+            malware-scan-results.json
+            secret-scan-results.json
+            sbom-scan-results.json
 
   ###################################################################
   # 4) UPLOAD VULNERABILITY SCAN RESULTS
@@ -101,6 +111,12 @@ jobs:
     needs: parse-scan-results
     runs-on: ubuntu-latest
     steps:
+      - name: Download Parsed Results
+        uses: actions/download-artifact@v3
+        with:
+          name: parsed-results
+          path: .
+
       - name: Upload Vulnerability Scan Results
         uses: actions/upload-artifact@v3
         with:
@@ -114,6 +130,12 @@ jobs:
     needs: parse-scan-results
     runs-on: ubuntu-latest
     steps:
+      - name: Download Parsed Results
+        uses: actions/download-artifact@v3
+        with:
+          name: parsed-results
+          path: .
+
       - name: Upload Malware Scan Results
         uses: actions/upload-artifact@v3
         with:
@@ -127,6 +149,12 @@ jobs:
     needs: parse-scan-results
     runs-on: ubuntu-latest
     steps:
+      - name: Download Parsed Results
+        uses: actions/download-artifact@v3
+        with:
+          name: parsed-results
+          path: .
+
       - name: Upload Secrets Scan Results
         uses: actions/upload-artifact@v3
         with:
@@ -140,6 +168,12 @@ jobs:
     needs: parse-scan-results
     runs-on: ubuntu-latest
     steps:
+      - name: Download Parsed Results
+        uses: actions/download-artifact@v3
+        with:
+          name: parsed-results
+          path: .
+
       - name: Upload SBOM Results
         uses: actions/upload-artifact@v3
         with:
