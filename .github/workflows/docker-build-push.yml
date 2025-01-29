@@ -35,10 +35,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Download Docker artifact
+      - name: Download Docker Image
         uses: actions/download-artifact@v3
         with:
           name: docker-image
@@ -52,12 +52,12 @@ jobs:
       - name: Set TMAS_API_KEY
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
-      - name: Run Full Security Scan
+      - name: Run Security Scan
         run: |
           tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
           ls -l SBOM_*.json || true
 
-      - name: Move SBOM file if exists
+      - name: Move SBOM File If Exists
         run: |
           SBOM_FILE=$(ls SBOM_*.json 2>/dev/null | head -n 1 || echo "")
           if [ -n "$SBOM_FILE" ]; then
@@ -93,7 +93,7 @@ jobs:
           name: scan-results
           path: .
 
-      - name: Install JQ (for JSON parsing)
+      - name: Install JQ for JSON Parsing
         run: sudo apt-get update -y && sudo apt-get install -y jq
 
       - name: Parse Vulnerabilities
@@ -201,16 +201,16 @@ jobs:
       - upload-sbom-results
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Download Docker artifact
+      - name: Download Docker Artifact
         uses: actions/download-artifact@v3
         with:
           name: docker-image
           path: .
 
-      - name: Load Docker image
+      - name: Load Docker Image
         run: docker load --input firefly.tar
 
       - name: Log in to Docker Hub
@@ -219,5 +219,5 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Push Docker image
+      - name: Push Docker Image
         run: docker push fafiorim/firefly:latest
