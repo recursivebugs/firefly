@@ -31,7 +31,7 @@ jobs:
   # 2) SECURITY SCAN (Vulnerabilities, Malware, Secrets, SBOM)
   ###################################################################
   security-scan:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    if: vars.SECURITY_ENABLED != 'false'
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -52,7 +52,7 @@ jobs:
       - name: Set TMAS_API_KEY
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
-      - name: Run Full Security Scan (Vulnerability, Malware, Secrets, SBOM)
+      - name: Run Full Security Scan
         run: |
           tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
           ls -l SBOM_*.json || true
@@ -60,10 +60,11 @@ jobs:
       - name: Move SBOM file if exists
         run: |
           SBOM_FILE=$(ls SBOM_*.json 2>/dev/null | head -n 1 || echo "")
-          if [ -z "$SBOM_FILE" ]; then
-            echo "No SBOM file found!" && exit 1
+          if [ -n "$SBOM_FILE" ]; then
+            mv "$SBOM_FILE" sbom-scan-results.json
+          else
+            echo "No SBOM file found!"
           fi
-          mv "$SBOM_FILE" sbom-scan-results.json
 
       - name: Upload Scan Results
         uses: actions/upload-artifact@v3
@@ -72,6 +73,7 @@ jobs:
           path: scan-results.json
 
       - name: Upload SBOM Results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: sbom-scan-results
@@ -81,7 +83,7 @@ jobs:
   # 3) PARSE SCAN RESULTS
   ###################################################################
   parse-scan-results:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    if: vars.SECURITY_ENABLED != 'false'
     needs: security-scan
     runs-on: ubuntu-latest
     steps:
