@@ -28,7 +28,7 @@ jobs:
           path: firefly.tar
 
   ###################################################################
-  # 2) SECURITY SCAN (Run all scans & SBOM generation)
+  # 2) SECURITY SCAN (Vulnerabilities, Malware, Secrets, SBOM)
   ###################################################################
   security-scan:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
@@ -186,7 +186,7 @@ jobs:
           path: sbom-scan-results.json
 
   ###################################################################
-  # 8) PUSH IMAGE
+  # 8) PUSH IMAGE (Only if Scans Pass)
   ###################################################################
   push-image:
     needs:
