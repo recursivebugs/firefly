@@ -53,18 +53,16 @@ jobs:
       - name: Run Full Security Scan
         run: tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
 
-      - name: Upload Scan Results
+      - name: Upload Raw Scan Results
         uses: actions/upload-artifact@v3
         with:
           name: scan-results
-          path: |
-            scan-results.json
-            SBOM_*.json
+          path: scan-results.json
 
   ###################################################################
-  # 3) PARSE AND UPLOAD SCAN RESULTS
+  # 3) PARSE SCAN RESULTS
   ###################################################################
-  parse-and-upload-results:
+  parse-scan-results:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: security-scan
     runs-on: ubuntu-latest
@@ -84,20 +82,107 @@ jobs:
           jq '{ malware: .malware }' scan-results.json > malware-scan-results.json
           jq '{ secrets: .secrets }' scan-results.json > secret-scan-results.json
 
-      - name: Upload All Results
+      - name: Upload Parsed Results
         uses: actions/upload-artifact@v3
         with:
-          name: all-scan-results
+          name: parsed-results
           path: |
             vulnerability-scan-results.json
             malware-scan-results.json
             secret-scan-results.json
 
   ###################################################################
-  # 4) PUSH IMAGE
+  # 4) VULNERABILITY SCANNER
+  ###################################################################
+  vulnerability-scanner:
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    needs: parse-scan-results
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Parsed Results
+        uses: actions/download-artifact@v3
+        with:
+          name: parsed-results
+          path: .
+
+      - name: Upload Vulnerability Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: vulnerability-scan-results
+          path: vulnerability-scan-results.json
+
+  ###################################################################
+  # 5) MALWARE SCANNER
+  ###################################################################
+  malware-scanner:
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    needs: parse-scan-results
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Parsed Results
+        uses: actions/download-artifact@v3
+        with:
+          name: parsed-results
+          path: .
+
+      - name: Upload Malware Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: malware-scan-results
+          path: malware-scan-results.json
+
+  ###################################################################
+  # 6) SECRETS SCANNER
+  ###################################################################
+  secrets-scanner:
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    needs: parse-scan-results
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Parsed Results
+        uses: actions/download-artifact@v3
+        with:
+          name: parsed-results
+          path: .
+
+      - name: Upload Secrets Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: secrets-scan-results
+          path: secret-scan-results.json
+
+  ###################################################################
+  # 7) SBOM SCANNER
+  ###################################################################
+  sbom-scanner:
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Scan Results
+        uses: actions/download-artifact@v3
+        with:
+          name: scan-results
+          path: .
+
+      - name: Check SBOM Files
+        run: ls -la SBOM_*.json || echo "No SBOM files found"
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-results
+          path: SBOM_*.json
+
+  ###################################################################
+  # 8) PUSH IMAGE
   ###################################################################
   push-image:
-    needs: parse-and-upload-results
+    needs:
+      - vulnerability-scanner
+      - malware-scanner
+      - secrets-scanner
+      - sbom-scanner
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
