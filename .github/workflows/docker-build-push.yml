@@ -56,29 +56,6 @@ jobs:
       - name: Debug - List Files
         run: ls -la
 
-      - name: Upload Scan Results and SBOM
-        uses: actions/upload-artifact@v3
-        with:
-          name: all-scan-results
-          path: |
-            scan-results.json
-            **/SBOM_*.json
-            ./SBOM_*.json
-
-  ###################################################################
-  # 3) PARSE SCAN RESULTS
-  ###################################################################
-  parse-scan-results:
-    needs: security-scan
-    runs-on: ubuntu-latest
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
-    steps:
-      - name: Download Scan Results
-        uses: actions/download-artifact@v3
-        with:
-          name: all-scan-results
-          path: .
-
       - name: Install jq
         run: sudo apt-get update -y && sudo apt-get install -y jq
 
@@ -87,6 +64,15 @@ jobs:
           jq '{ vulnerabilities: .vulnerabilities }' scan-results.json > vulnerability-scan-results.json
           jq '{ malware: .malware }' scan-results.json > malware-scan-results.json
           jq '{ secrets: .secrets }' scan-results.json > secret-scan-results.json
+
+      - name: Upload Raw Scan Results and SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: all-scan-results
+          path: |
+            scan-results.json
+            **/SBOM_*.json
+            ./SBOM_*.json
 
       - name: Upload Parsed Results
         uses: actions/upload-artifact@v3
@@ -98,10 +84,10 @@ jobs:
             secret-scan-results.json
 
   ###################################################################
-  # 4) VULNERABILITY SCANNER
+  # 3) VULNERABILITY SCANNER
   ###################################################################
   vulnerability-scanner:
-    needs: parse-scan-results
+    needs: security-scan
     runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
@@ -141,10 +127,10 @@ jobs:
           path: vulnerability-scan-results.json
 
   ###################################################################
-  # 5) MALWARE SCANNER
+  # 4) MALWARE SCANNER
   ###################################################################
   malware-scanner:
-    needs: parse-scan-results
+    needs: security-scan
     runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
@@ -179,10 +165,10 @@ jobs:
           path: malware-scan-results.json
 
   ###################################################################
-  # 6) SECRETS SCANNER
+  # 5) SECRETS SCANNER
   ###################################################################
   secrets-scanner:
-    needs: parse-scan-results
+    needs: security-scan
     runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
@@ -222,7 +208,7 @@ jobs:
           path: secret-scan-results.json
 
   ###################################################################
-  # 7) SBOM
+  # 6) SBOM SCANNER
   ###################################################################
   sbom-scanner:
     needs: security-scan
@@ -251,7 +237,7 @@ jobs:
         continue-on-error: true
 
   ###################################################################
-  # 8) PUSH IMAGE
+  # 7) PUSH IMAGE
   ###################################################################
   push-image:
     needs:
