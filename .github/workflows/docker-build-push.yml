@@ -31,9 +31,9 @@ jobs:
   # 2) SECURITY SCAN
   ###################################################################
   security-scan:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: build
     runs-on: ubuntu-latest
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -69,9 +69,9 @@ jobs:
   # 3) PARSE SCAN RESULTS
   ###################################################################
   parse-scan-results:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: security-scan
     runs-on: ubuntu-latest
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Scan Results
         uses: actions/download-artifact@v3
@@ -101,9 +101,9 @@ jobs:
   # 4) VULNERABILITY SCANNER
   ###################################################################
   vulnerability-scanner:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: parse-scan-results
     runs-on: ubuntu-latest
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
         uses: actions/download-artifact@v3
@@ -144,9 +144,9 @@ jobs:
   # 5) MALWARE SCANNER
   ###################################################################
   malware-scanner:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: parse-scan-results
     runs-on: ubuntu-latest
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
         uses: actions/download-artifact@v3
@@ -182,9 +182,9 @@ jobs:
   # 6) SECRETS SCANNER
   ###################################################################
   secrets-scanner:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: parse-scan-results
     runs-on: ubuntu-latest
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
         uses: actions/download-artifact@v3
@@ -225,9 +225,9 @@ jobs:
   # 7) SBOM SCANNER
   ###################################################################
   sbom-scanner:
-    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     needs: security-scan
     runs-on: ubuntu-latest
+    if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download All Results
         uses: actions/download-artifact@v3
@@ -255,24 +255,25 @@ jobs:
   ###################################################################
   push-image:
     needs:
-      - build
       - vulnerability-scanner
       - malware-scanner
       - secrets-scanner
       - sbom-scanner
-    if: |
-      success() &&
-      (
-        vars.SECURITY_ENABLED == 'false' ||
-        (
-          vars.SECURITY_ENABLED != 'false' &&
-          (needs.vulnerability-scanner.result == 'success' || needs.vulnerability-scanner.result == 'skipped') &&
-          (needs.malware-scanner.result == 'success' || needs.malware-scanner.result == 'skipped') &&
-          (needs.secrets-scanner.result == 'success' || needs.secrets-scanner.result == 'skipped') &&
-          (needs.sbom-scanner.result == 'success' || needs.sbom-scanner.result == 'skipped')
-        )
-      )
     runs-on: ubuntu-latest
+    if: |
+      always() &&
+      (
+        needs.vulnerability-scanner.result == 'success' || needs.vulnerability-scanner.result == 'skipped'
+      ) &&
+      (
+        needs.malware-scanner.result == 'success' || needs.malware-scanner.result == 'skipped'
+      ) &&
+      (
+        needs.secrets-scanner.result == 'success' || needs.secrets-scanner.result == 'skipped'
+      ) &&
+      (
+        needs.sbom-scanner.result == 'success' || needs.sbom-scanner.result == 'skipped'
+      )
     steps:
       - name: Checkout
         uses: actions/checkout@v3
