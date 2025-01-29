@@ -28,7 +28,10 @@ jobs:
           {
             echo "=== Docker Image Build Summary ==="
             echo "Image Name: fafiorim/firefly:latest"
-            echo "Build Digest: $BUILD_DIGEST"
+            echo "Local Build Digest: $BUILD_DIGEST"
+            echo "(Note: This is the local build digest, registry digest will be different after push)"
+            echo "Image Size: $IMAGE_SIZE"
+            echo "Container Archive: firefly.tar"
           } >> $GITHUB_STEP_SUMMARY
           
           # Save digest for later use
@@ -335,7 +338,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Registry Details:" >> $GITHUB_STEP_SUMMARY
           echo "- Registry: docker.io" >> $GITHUB_STEP_SUMMARY
-          echo "- Full Image Reference with Digest:" >> $GITHUB_STEP_SUMMARY
+          echo "- Registry Digest (differs from build digest):" >> $GITHUB_STEP_SUMMARY
           echo "$DIGEST" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Example kubectl commands to deploy this image:" >> $GITHUB_STEP_SUMMARY
