@@ -53,11 +53,26 @@ jobs:
       - name: Run Full Security Scan (Vulnerability, Malware, Secrets, SBOM)
         run: tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
 
+      - name: Find SBOM File
+        run: |
+          SBOM_FILE=$(ls SBOM_*.json 2>/dev/null | head -n 1)
+          if [ -z "$SBOM_FILE" ]; then
+            echo "No SBOM file found!" && exit 1
+          fi
+          echo "SBOM file found: $SBOM_FILE"
+          mv "$SBOM_FILE" sbom-scan-results.json
+
       - name: Upload Scan Results
         uses: actions/upload-artifact@v3
         with:
           name: scan-results
           path: scan-results.json
+
+      - name: Upload SBOM Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-scan-results
+          path: sbom-scan-results.json
 
   ###################################################################
   # 3) PARSE SCAN RESULTS
@@ -85,15 +100,6 @@ jobs:
       - name: Parse Secrets
         run: jq '{ secrets: .secrets }' scan-results.json > secret-scan-results.json
 
-      - name: Find SBOM File
-        run: |
-          SBOM_FILE=$(ls SBOM_*.json 2>/dev/null | head -n 1)
-          if [ -z "$SBOM_FILE" ]; then
-            echo "No SBOM file found!" && exit 1
-          fi
-          echo "SBOM file found: $SBOM_FILE"
-          mv "$SBOM_FILE" sbom-scan-results.json
-
       - name: Upload Parsed Results
         uses: actions/upload-artifact@v3
         with:
@@ -102,7 +108,6 @@ jobs:
             vulnerability-scan-results.json
             malware-scan-results.json
             secret-scan-results.json
-            sbom-scan-results.json
 
   ###################################################################
   # 4) UPLOAD VULNERABILITY SCAN RESULTS
@@ -165,13 +170,13 @@ jobs:
   # 7) UPLOAD SBOM RESULTS
   ###################################################################
   upload-sbom-results:
-    needs: parse-scan-results
+    needs: security-scan
     runs-on: ubuntu-latest
     steps:
-      - name: Download Parsed Results
+      - name: Download SBOM Scan Results
         uses: actions/download-artifact@v3
         with:
-          name: parsed-results
+          name: sbom-scan-results
           path: .
 
       - name: Upload SBOM Results
