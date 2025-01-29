@@ -16,7 +16,21 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Build Docker image
-        run: docker build -t fafiorim/firefly:latest .
+        id: build
+        run: |
+          # Build the image and capture the output
+          docker build -t fafiorim/firefly:latest . 2>&1 | tee build_output.log
+          
+          # Extract the digest from the build output
+          BUILD_DIGEST=$(grep 'writing image sha256:' build_output.log | awk '{print $3}')
+          
+          # Write build summary
+          echo "=== Docker Image Build Summary ===" >> $GITHUB_STEP_SUMMARY
+          echo "Image Name: fafiorim/firefly:latest" >> $GITHUB_STEP_SUMMARY
+          echo "Build Digest: $BUILD_DIGEST" >> $GITHUB_STEP_SUMMARY
+          
+          # Save digest for later use
+          echo "build_digest=$BUILD_DIGEST" >> $GITHUB_OUTPUT
 
       - name: Save Docker image
         run: |
@@ -24,13 +38,9 @@ jobs:
           docker save fafiorim/firefly:latest -o firefly.tar
           
           # Get image details
-          IMAGE_ID=$(docker images fafiorim/firefly:latest --format "{{.ID}}")
           IMAGE_SIZE=$(docker images fafiorim/firefly:latest --format "{{.Size}}")
           
-          # Write to step summary
-          echo "=== Docker Image Build Summary ===" >> $GITHUB_STEP_SUMMARY
-          echo "Image Name: fafiorim/firefly:latest" >> $GITHUB_STEP_SUMMARY
-          echo "Image ID: $IMAGE_ID" >> $GITHUB_STEP_SUMMARY
+          # Append to build summary
           echo "Image Size: $IMAGE_SIZE" >> $GITHUB_STEP_SUMMARY
           echo "Container Archive: firefly.tar" >> $GITHUB_STEP_SUMMARY
 
