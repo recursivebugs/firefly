@@ -111,7 +111,30 @@ jobs:
           name: parsed-results
           path: .
 
+      - name: Process Vulnerability Results
+        id: vuln_check
+        run: |
+          echo "=== Vulnerability Scan Summary ===" >> $GITHUB_STEP_SUMMARY
+          
+          CRITICAL=$(jq -r '.vulnerabilities.criticalCount' vulnerability-scan-results.json)
+          HIGH=$(jq -r '.vulnerabilities.highCount' vulnerability-scan-results.json)
+          MEDIUM=$(jq -r '.vulnerabilities.mediumCount' vulnerability-scan-results.json)
+          LOW=$(jq -r '.vulnerabilities.lowCount' vulnerability-scan-results.json)
+          TOTAL=$(jq -r '.vulnerabilities.totalVulnCount' vulnerability-scan-results.json)
+          
+          echo "Total Vulnerabilities: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "Critical: $CRITICAL" >> $GITHUB_STEP_SUMMARY
+          echo "High: $HIGH" >> $GITHUB_STEP_SUMMARY
+          echo "Medium: $MEDIUM" >> $GITHUB_STEP_SUMMARY
+          echo "Low: $LOW" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "Critical vulnerabilities found: $CRITICAL" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
       - name: Upload Vulnerability Results
+        if: success() || failure()
         uses: actions/upload-artifact@v3
         with:
           name: vulnerability-scan-results
@@ -131,7 +154,25 @@ jobs:
           name: parsed-results
           path: .
 
+      - name: Process Malware Results
+        id: malware_check
+        run: |
+          echo "=== Malware Scan Summary ===" >> $GITHUB_STEP_SUMMARY
+          
+          FINDINGS_COUNT=$(jq -r '.malware.findings | length' malware-scan-results.json)
+          echo "Total Malware Findings: $FINDINGS_COUNT" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$FINDINGS_COUNT" -gt 0 ]; then
+            echo "Malware detected!" >> $GITHUB_STEP_SUMMARY
+            echo "Details:" >> $GITHUB_STEP_SUMMARY
+            jq -r '.malware.findings[] | "File: \(.fileName)\nMalware: \(.foundMalwares[].malwareName)"' malware-scan-results.json >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "No malware detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload Malware Results
+        if: success() || failure()
         uses: actions/upload-artifact@v3
         with:
           name: malware-scan-results
@@ -151,7 +192,30 @@ jobs:
           name: parsed-results
           path: .
 
+      - name: Process Secrets Results
+        id: secrets_check
+        run: |
+          echo "=== Secrets Scan Summary ===" >> $GITHUB_STEP_SUMMARY
+          
+          TOTAL_FILES=$(jq -r '.secrets.totalFilesScanned' secret-scan-results.json)
+          UNMITIGATED=$(jq -r '.secrets.unmitigatedFindingsCount' secret-scan-results.json)
+          OVERRIDDEN=$(jq -r '.secrets.overriddenFindingsCount' secret-scan-results.json)
+          
+          echo "Files Scanned: $TOTAL_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "Unmitigated Findings: $UNMITIGATED" >> $GITHUB_STEP_SUMMARY
+          echo "Overridden Findings: $OVERRIDDEN" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$UNMITIGATED" -gt 0 ]; then
+            echo "Secrets detected!" >> $GITHUB_STEP_SUMMARY
+            echo "Details:" >> $GITHUB_STEP_SUMMARY
+            jq -r '.secrets.findings.unmitigated[] | "Rule: \(.ruleID)\nPath: \(.location.path)"' secret-scan-results.json >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "No secrets detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload Secrets Results
+        if: success() || failure()
         uses: actions/upload-artifact@v3
         with:
           name: secrets-scan-results
