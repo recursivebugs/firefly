@@ -12,6 +12,7 @@ RUN apk update && apk add --no-cache curl
 
 # Create a random file so each build has a new digest
 RUN echo $RANDOM > /tmp/random-build-file
+RUN echo $RANDOM > /tmp/random-build-file2
 
 # Copy the welcome page HTML to the NGINX default directory
 COPY index.html /usr/share/nginx/html/index.html
