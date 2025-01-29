@@ -80,19 +80,20 @@ jobs:
 
       - name: Run Full Security Scan
         run: |
-          # Run the scan with verbose output
-          tmas scan docker-archive:firefly.tar -VMS --saveSBOM -v 2>&1 | tee tmas_output.log > scan-results.json
+          # Run the scan and capture output
+          tmas scan docker-archive:firefly.tar -VMS --saveSBOM 2>&1 | tee tmas_output.log > scan-results.json
           
           # Extract the digest from tmas output
           SCAN_DIGEST=$(grep 'linux/amd64 Digest=' tmas_output.log | sed -n 's/.*linux\/amd64 Digest="\(sha256:[a-f0-9]*\)".*/\1/p')
           
-          echo "=== TMAS Verbose Output ===" >> $GITHUB_STEP_SUMMARY
-          cat tmas_output.log >> $GITHUB_STEP_SUMMARY
-          echo -e "\n=== Security Scan Summary ===" >> $GITHUB_STEP_SUMMARY
-          echo "Scanned Image: fafiorim/firefly:latest" >> $GITHUB_STEP_SUMMARY
-          echo "Scan Digest: $SCAN_DIGEST" >> $GITHUB_STEP_SUMMARY
-          echo "Scan Results: scan-results.json" >> $GITHUB_STEP_SUMMARY
-          echo "SBOM Generated: true" >> $GITHUB_STEP_SUMMARY
+          # Write scan summary
+          {
+            echo "=== Security Scan Summary ==="
+            echo "Scanned Image: fafiorim/firefly:latest"
+            echo "Scan Digest: $SCAN_DIGEST"
+            echo "Scan Results: scan-results.json"
+            echo "SBOM Generated: true"
+          } > $GITHUB_STEP_SUMMARY
 
       - name: Debug - List Files
         run: ls -la
