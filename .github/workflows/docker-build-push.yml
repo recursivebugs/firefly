@@ -79,7 +79,20 @@ jobs:
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
       - name: Run Full Security Scan
-        run: tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
+        run: |
+          # Run the scan and capture both stdout and stderr
+          tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json 2> tmas_output.log
+          
+          # Extract the digest from tmas output
+          SCAN_DIGEST=$(grep -o 'sha256:[a-f0-9]*' tmas_output.log | head -1)
+          
+          # Write scan summary
+          {
+            echo "=== Security Scan Summary ==="
+            echo "Scanned Image: fafiorim/firefly:latest"
+            echo "Scan Digest: $SCAN_DIGEST"
+            echo "Scan Results: scan-results.json"
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Debug - List Files
         run: ls -la
