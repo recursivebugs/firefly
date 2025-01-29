@@ -28,7 +28,7 @@ jobs:
           path: firefly.tar
 
   ###################################################################
-  # 2) SECURITY SCAN
+  # 2) SECURITY SCAN (Generate scan results and SBOM)
   ###################################################################
   security-scan:
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
@@ -50,11 +50,8 @@ jobs:
       - name: Set TMAS_API_KEY
         run: echo "TMAS_API_KEY=${{ secrets.TMAS_API_KEY }}" >> $GITHUB_ENV
 
-      - name: Run Full Security Scan
+      - name: Run Full Security Scan (Vulnerability, Malware, Secrets)
         run: tmas scan docker-archive:firefly.tar -VMS --saveSBOM > scan-results.json
-
-      - name: Debug - Check if scan-results.json Exists
-        run: ls -l scan-results.json
 
       - name: Upload Scan Results
         uses: actions/upload-artifact@v3
@@ -76,23 +73,26 @@ jobs:
           name: scan-results
           path: .
 
-      - name: Debug - Check Scan Results File
-        run: ls -l scan-results.json
+      - name: Install JQ (for JSON parsing)
+        run: sudo apt-get update -y && sudo apt-get install -y jq
 
       - name: Parse Vulnerabilities
-        run: |
-          sudo apt-get update -y && sudo apt-get install -y jq
-          jq '{ vulnerabilities: .vulnerabilities }' scan-results.json > vulnerability-scan-results.json
+        run: jq '{ vulnerabilities: .vulnerabilities }' scan-results.json > vulnerability-scan-results.json
 
       - name: Parse Malware
-        run: |
-          sudo apt-get update -y && sudo apt-get install -y jq
-          jq '{ malware: .malware }' scan-results.json > malware-scan-results.json
+        run: jq '{ malware: .malware }' scan-results.json > malware-scan-results.json
 
       - name: Parse Secrets
+        run: jq '{ secrets: .secrets }' scan-results.json > secret-scan-results.json
+
+      - name: Find SBOM File
         run: |
-          sudo apt-get update -y && sudo apt-get install -y jq
-          jq '{ secrets: .secrets }' scan-results.json > secret-scan-results.json
+          SBOM_FILE=$(ls SBOM_*.json | head -n 1)
+          if [ -z "$SBOM_FILE" ]; then
+            echo "No SBOM file found!" && exit 1
+          fi
+          echo "SBOM file found: $SBOM_FILE"
+          mv "$SBOM_FILE" sbom-scan-results.json
 
   ###################################################################
   # 4) UPLOAD VULNERABILITY SCAN RESULTS
@@ -134,17 +134,17 @@ jobs:
           path: secret-scan-results.json
 
   ###################################################################
-  # 7) UPLOAD SBOM
+  # 7) UPLOAD SBOM RESULTS
   ###################################################################
-  upload-sbom:
-    needs: security-scan
+  upload-sbom-results:
+    needs: parse-scan-results
     runs-on: ubuntu-latest
     steps:
       - name: Upload SBOM Results
         uses: actions/upload-artifact@v3
         with:
-          name: sbom-report
-          path: SBOM_*.json
+          name: sbom-scan-results
+          path: sbom-scan-results.json
 
   ###################################################################
   # 8) PUSH IMAGE
@@ -154,7 +154,7 @@ jobs:
       - upload-vulnerability-results
       - upload-malware-results
       - upload-secrets-results
-      - upload-sbom
+      - upload-sbom-results
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
