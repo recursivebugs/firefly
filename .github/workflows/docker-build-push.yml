@@ -32,7 +32,7 @@ jobs:
             echo "(Note: This is the local build digest, registry digest will be different after push)"
             echo "Image Size: $IMAGE_SIZE"
             echo "Container Archive: firefly.tar"
-          } >> $GITHUB_STEP_SUMMARY
+          } > $GITHUB_STEP_SUMMARY  # Using > instead of >> to ensure we don't duplicate
           
           # Save digest for later use
           echo "build_digest=$BUILD_DIGEST" >> $GITHUB_OUTPUT
@@ -80,11 +80,11 @@ jobs:
 
       - name: Run Full Security Scan
         run: |
-          # Run the scan and capture both stdout and stderr
+          # Run the scan and capture output
           tmas scan docker-archive:firefly.tar -VMS --saveSBOM 2>&1 | tee tmas_output.log > scan-results.json
           
-          # Extract the digest from tmas output (looking for the linux/amd64 Digest)
-          SCAN_DIGEST=$(grep 'linux/amd64 Digest=' tmas_output.log | sed -n 's/.*Digest="\(sha256:[a-f0-9]*\)".*/\1/p')
+          # Extract the digest from tmas output
+          SCAN_DIGEST=$(grep 'linux/amd64 Digest=' tmas_output.log | sed -n 's/.*linux\/amd64 Digest="\(sha256:[a-f0-9]*\)".*/\1/p')
           
           # Write scan summary
           {
@@ -92,9 +92,8 @@ jobs:
             echo "Scanned Image: fafiorim/firefly:latest"
             echo "Scan Digest: $SCAN_DIGEST"
             echo "Scan Results: scan-results.json"
-            echo ""
-            cat tmas_output.log >> $GITHUB_STEP_SUMMARY
-          } >> $GITHUB_STEP_SUMMARY
+            echo "SBOM Generated: true"
+          } > $GITHUB_STEP_SUMMARY
 
       - name: Debug - List Files
         run: ls -la
