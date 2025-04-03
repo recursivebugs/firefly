@@ -10,7 +10,8 @@ jobs:
   # 1) BUILD JOB
   ###################################################################
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    #runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -60,7 +61,8 @@ jobs:
   ###################################################################
   security-scan:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+#    runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Checkout
@@ -110,7 +112,8 @@ jobs:
   ###################################################################
   parse-scan-results:
     needs: security-scan
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    #runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Scan Results
@@ -142,7 +145,8 @@ jobs:
   ###################################################################
   vulnerability-scanner:
     needs: parse-scan-results
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    #runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
@@ -185,7 +189,8 @@ jobs:
   ###################################################################
   malware-scanner:
     needs: parse-scan-results
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    #runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
@@ -223,7 +228,8 @@ jobs:
   ###################################################################
   secrets-scanner:
     needs: parse-scan-results
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    #runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download Parsed Results
@@ -266,7 +272,8 @@ jobs:
   ###################################################################
   sbom-scanner:
     needs: security-scan
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    #runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_ENABLED != 'false' }}
     steps:
       - name: Download All Results
@@ -299,7 +306,8 @@ jobs:
       - malware-scanner
       - secrets-scanner
       - sbom-scanner
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    #runs-on: ubuntu-latest
     if: |
       always() &&
       (
